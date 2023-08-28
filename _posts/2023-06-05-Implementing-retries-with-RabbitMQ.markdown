@@ -7,17 +7,20 @@ Overall, RabbitMQ and Spring are well-integrated and flexible platforms, so we h
 
 # Spring Retry
 The first and most obvious option was Spring Retry (https://github.com/spring-projects/spring-retry), which is quite mature and simple to use. It already has plenty of options for retry configuration out of the box:
+
+```java
         org.springframework.amqp.rabbit.config.RetryInterceptorBuilder
                 .stateless()
                 .maxAttempts(5)
                 .backOffOptions(1000, 10, 500000)
                 .build();
+```
 
 However, it was rejected as it implements client-side delays and basically blocks the executing thread during retry delays. Furthermore, its stateless implementation may lead to lost messages if the node stops working. Its stateful implementation requires manual implementation, making it more complex and ineffective in a cluster setup.
 
 # RabbitMQ Delayed Message Plugin (available for RabbitMQ 3.8.16+)
 
-**https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/**
+[https://github.com/rabbitmq/rabbitmq-delayed-message-exchange](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/)
 
 This was another option to implement retries. The idea behind it is simple: each message may have an "x-delay" header that is utilized by RabbitMQ's new "x-delayed-type" exchange flag to postpone the message publication. This solution is also quite stable, and it's even supported in Spring AMQP (since 1.6) through the Message.getMessageProperties().setDelay(Integer) method.
 
