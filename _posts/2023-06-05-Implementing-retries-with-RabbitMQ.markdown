@@ -1,3 +1,5 @@
+<style>body {text-align: justify}</style>
+
 # The Problem Description
 
 During the migration of the monolithic application into a set of microservices, we introduced the RabbitMQ broker in its architecture to satisfy our needs for transparent separation of asynchronous scenarios. It worked well and allowed us to greatly simplify the main, most time-critical application and improve response times of the synchronous services that got rid of all potentially asynchronous code. However, during the migration of one of these services, we faced the need to deal with external services that experienced temporary outages. This required us to implement some kind of retry logic. Making it more complex was the requirement for delays to increase with the retry number (exponential backoff). The external service could be down for a couple of minutes to days, and we shouldn't discard these messages. At the same time, we should not overload gateways with constant retries.
@@ -42,9 +44,8 @@ So, we decided to implement a slightly more sophisticated version that shares de
 The first step was to separate the cases when a retry is actually needed. For that reason, we introduced the RetryException, so the client logic can identify such cases and wrap those errors into this exception class.
 In the message listener code any exceptions that should result in retry should be wrapped into the RetryException and re-thrown:
 
-```
+```java
    @RabbitHandler
-
    public void processMessage(@Payload SomeMessage message) {
 
        ...
@@ -58,15 +59,13 @@ In the message listener code any exceptions that should result in retry should b
            throw new RetryException(e);
 
        }
-
        ...
-
    }
 ```
 
 Then we introduced the RetryPolicy interface that encapsulates all retry details:
 
-```
+```java
 public interface RetryPolicy {
    String getQueue();
    Integer getDelay(int retries);
@@ -79,7 +78,7 @@ public interface RetryPolicy {
 Its implementations are trivial, even for exponential backoff cases:
 
 
-```
+```java
 @Getter
 @AllArgsConstructor
 public class FixedDelayRetryPolicy implements RetryPolicy {
@@ -131,7 +130,7 @@ public class ExponentialBackoffRetryPolicy implements RetryPolicy {
 
 We also introduced custom message headers for the delay, retry number, and original queue name
 
-```
+```java
 public abstract class AmqpMessageHeaders {
    public static final String RETURN_TO = "return-to";
    public static final String WAIT_FOR = "wait-for";
@@ -144,7 +143,7 @@ Now we have two more pieces left: ErrorHandler to handle RetryExceptions and exc
 The ErrorHandler implementation is quite straightforward:
 It checks the exception type, finds the RetryPolicy based on the queue name, and acquires the required delay from the policy for the current retry number (from the message header). If the required retry count is not exceeded, then the three message headers mentioned above are added (or updated), and the message is sent to the wait exchange.
 
-```
+```java
 public class AmqpListenerErrorHandler implements ErrorHandler {
    private final AmqpTemplate amqpTemplate;
    private String waitMessageExchange;
@@ -205,7 +204,7 @@ public class AmqpListenerErrorHandler implements ErrorHandler {
 This listener should be added to the RabbitListenerContainerFactory configuration:
 
 
-```
+```java
    @Bean
    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(Set<RetryPolicy> retryPolicies) {
 
@@ -221,7 +220,7 @@ This listener should be added to the RabbitListenerContainerFactory configuratio
 Also, note the "factory.setDefaultRequeueRejected(false)" part that prevents messages from automatical re-queue.
 To create and wire all exchanges and queues, we used the usual Spring AMQP bean configurations that automatically create delay queues and bind them to the wait exchange:
 
-```
+```java
    @Bean
    public Declarables retryBindings(Set<RetryPolicy> retryPolicies) {
        HeadersExchange returnMessageExchange = new HeadersExchange(AmqpNames.RETURN_EXCHANGE);
@@ -256,9 +255,9 @@ Here, all possible delays are collected from registered retry policies.
 So, now for any new queue that should be retried you only need to define its RetryPolicy bean, and bind the queue to the return exchange.
 All missing delay queues will be created and bound automatically:
 
-```
-   @Bean
+```java
 
+   @Bean
    public Declarables someQueueBindings() {
        TopicExchange someExchange = new TopicExchange(AmqpNames.SOME_EXCHANGE);
        Queue someQueue = QueueBuilder

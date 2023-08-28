@@ -27,6 +27,11 @@ markdown: kramdown
 theme: minima
 plugins:
   - jekyll-feed
+highlighter: rouge
+kramdown:
+  input: GFM
+  auto_ids: true
+  syntax_highlighter: rouge
 
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
